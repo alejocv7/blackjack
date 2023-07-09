@@ -28,6 +28,7 @@ Game dynamics (1 dealer vs 1 player):
     10. If both dealer and player have the same sum, called a "push", no one wins
 """
 
+import os
 import random
 
 DECK_SUITS = 4
@@ -103,46 +104,37 @@ def ask_hit_stand():
     return hit_stand
 
 
-def is_blackjack(player_hand: Hand) -> bool:
-    return player_hand.sum == 21 and len(player_hand.cards) == 2
+def is_blackjack(player_hand: Hand, dealer_hand: Hand) -> bool:
+    return (
+        len(player_hand.cards) == len(dealer_hand.cards) == 2 and player_hand.sum == 21
+    )
 
 
 def check_win(
     player_hand: Hand,
     player_chips: ChipAccount,
     dealer_hand: Hand,
-) -> bool:
+) -> None:
     if player_hand.sum > dealer_hand.sum:
-        if is_blackjack(player_hand):
-            player_chips.deposit(3 / 2 * player_chips.bet)
-            print("\n\t*************************************")
-            print(f"\t    {player_chips.owner}, you got a BlackJack")
-            print("\t You get a bonus of 3/2 times your bet")
-            print("\t***************************************")
+        if is_blackjack(player_hand, dealer_hand):
+            bonus = 3 / 2 * player_chips.bet
+            print(f"\n\t**** 🎉 {player_chips.owner}, you win with a BlackJack! 🎉 ****")
+            print(f"\t  Your bonus is 3/2 * your bet, so {bonus} chips")
+            player_chips.deposit(bonus)
 
         else:
             player_chips.deposit(player_chips.bet)
-            print("\n\t********************")
-            print(f"\t  {player_chips.owner}, you win!")
-            print("\t********************")
-
-        return True
+            print(f"\n\t**** 🎉 {player_chips.owner}, you win! 🎉 ****")
 
     elif player_hand.sum == dealer_hand.sum:
-        blackjack_msg = " of BlackJacks" if is_blackjack(player_hand) else ""
-        print("\n\t********************************")
-        print(f"\tUff, that's a TIE{blackjack_msg}!")
-        print("\t********************************")
-        return True
+        blackjack_msg = (
+            " of BlackJacks" if is_blackjack(player_hand, dealer_hand) else ""
+        )
+        print(f"\n\t**** Uff, that's a TIE{blackjack_msg}! ****")
 
     else:
         player_chips.withdraw(player_chips.bet)
-        print("\n\t************")
-        print("\tDealer Wins!")
-        print("\t************")
-        return True
-
-    return False
+        print("\n\t**** 😢 Dealer Wins! 😢 ****")
 
 
 def ask_if_should_play_again() -> bool:
@@ -155,6 +147,9 @@ def ask_if_should_play_again() -> bool:
 
 
 def run():
+    # Clear the terminal
+    os.system("clear" if os.name == "posix" else "cls")
+
     starting_balance = 100
 
     print("Welcome to BlackJack!")
@@ -174,19 +169,14 @@ def run():
 
         # Initialize player and dealer's hand, and deal cards
         player_hand = Hand(player_name)
-        player_hand.add_card(deck.pop())
-        player_hand.add_card(deck.pop())
-
         dealer_hand = Hand("Dealer")
-        dealer_hand.add_card(deck.pop())
-        dealer_hand.add_card(deck.pop())
-
-        # Print Cards to start game
+        for _ in range(2):
+            player_hand.add_card(deck.pop())
+            dealer_hand.add_card(deck.pop())
         print_hands(player_hand, dealer_hand)
 
-        player_hand.sum = 21
-        # Check for Instant BlackJack
-        if is_blackjack(player_hand):
+        # Check for instant BlackJack
+        if is_blackjack(player_hand, dealer_hand):
             print_hands(player_hand, dealer_hand, hide=False)
             check_win(player_hand, player_chips, dealer_hand)
         else:
@@ -200,10 +190,7 @@ def run():
                 player_hand.adjust_sum()
                 if player_hand.sum > 21:
                     player_chips.withdraw(player_chips.bet)
-                    print("\n\t************")
-                    print("\t You bust!")
-                    print("\tDealer wins!")
-                    print("\t************")
+                    print("\n\t**** 😢 You bust! Dealer wins! 😢 ****")
                     print_hands(player_hand, dealer_hand, hide=False)
                     break
 
@@ -215,6 +202,7 @@ def run():
                     player_hand, dealer_hand, hide=False
                 )  # Reveals dealer's hidden cards
 
+                # A dealer can only hit until he/she has a 17
                 while dealer_hand.sum < 17:
                     dealer_hand.add_card(deck.pop())
                     print_hands(player_hand, dealer_hand, hide=False)
@@ -223,10 +211,7 @@ def run():
                     dealer_hand.adjust_sum()
                     if dealer_hand.sum > 21:
                         player_chips.deposit(player_chips.bet)
-                        print("\n\t*************")
-                        print("\tDealer busts!")
-                        print("\t  You win!")
-                        print("\t*************")
+                        print("\n\t**** 🎉 Dealer busts! You win! 🎉 ****")
                         break
 
                 if not dealer_hand.sum > 21:
