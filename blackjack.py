@@ -2,7 +2,6 @@
 Welcome to BlackJack! Get as close to 21 as you can without going over!
 
 Game dynamics (1 dealer vs 1 player):
-
     1. We start with two cards face up for the player and two cards,
     one face down and one face up, for the dealer.
 
@@ -49,7 +48,7 @@ class ChipAccount:
     def ask_bet(self):
         while True:
             try:
-                self.bet = int(input("\tWhat's your bet: "))
+                self.bet = int(input("\tWhat's your bet?: "))
             except ValueError:
                 print("\nInvalid input. Please enter a number")
             else:
@@ -63,81 +62,50 @@ class Hand:
     def __init__(self, name):
         self.name = name
         self.cards = []
-        self.sum = 0
+        self.score = 0
         self.aces = 0
 
     def add_card(self, card):
         self.cards.append(card)
+        self.update_score_with_card(card)
 
-        # Calculates the sum of cards
+    def update_score_with_card(self, card):
+        """Updates the score adjusting for any aces"""
         if card in {"Jack", "Queen", "King"}:
-            self.sum += 10
+            self.score += 10
         elif card == "Ace":
             self.aces += 1
-            self.sum += 11
+            self.score += 11
         else:
-            self.sum += card
+            self.score += card
 
-    def adjust_sum(self):
-        # Adjust the sum for any Ace in the hand
-        while self.sum > 21 and self.aces:
-            self.sum -= 10
+        # Adjust for aces
+        while self.score > 21 and self.aces:
+            self.score -= 10
             self.aces -= 1
 
 
-def print_hands(player_hand, dealer_hand, hide=True):
-    if hide:
-        print("\nDealer's hand is: | < Hidden Card >", dealer_hand.cards[1], sep=" | ")
-        print(f"{player_hand.name}'s hand is:", *player_hand.cards, sep=" | ")
+def print_hands(player_hand, dealer_hand, hiden_dealer=True):
+    if hiden_dealer:
+        dealer_cards = f"< Hidden Card > | {dealer_hand.cards[1]}"
     else:
-        print("\nDealer's hand is:", *dealer_hand.cards, sep=" | ")
-        print(f"{player_hand.name}'s hand is:", *player_hand.cards, sep=" | ")
+        dealer_cards = " | ".join(str(c) for c in dealer_hand.cards)
 
-
-def ask_hit_stand():
-    hit_stand = ""
-    while hit_stand not in {"h", "s"}:
-        hit_stand = input(
-            "\n\tDo you want to hit or stand? (insert 'h' or 's'): "
-        ).lower()
-
-    return hit_stand
-
-
-def is_blackjack(player_hand: Hand, dealer_hand: Hand) -> bool:
-    return (
-        len(player_hand.cards) == len(dealer_hand.cards) == 2 and player_hand.sum == 21
+    print(f"\nDealer's hand is:\n\t{dealer_cards}")
+    print(
+        f"{player_hand.name}'s hand is:\n\t"
+        f"{' | '.join(str(c) for c in player_hand.cards)}"
     )
 
 
-def check_win(
-    player_hand: Hand,
-    player_chips: ChipAccount,
-    dealer_hand: Hand,
-) -> None:
-    if player_hand.sum > dealer_hand.sum:
-        if is_blackjack(player_hand, dealer_hand):
-            bonus = 3 / 2 * player_chips.bet
-            print(f"\n\t**** 🎉 {player_chips.owner}, you win with a BlackJack! 🎉 ****")
-            print(f"\t  Your bonus is 3/2 * your bet, so {bonus} chips")
-            player_chips.deposit(bonus)
-
-        else:
-            player_chips.deposit(player_chips.bet)
-            print(f"\n\t**** 🎉 {player_chips.owner}, you win! 🎉 ****")
-
-    elif player_hand.sum == dealer_hand.sum:
-        blackjack_msg = (
-            " of BlackJacks" if is_blackjack(player_hand, dealer_hand) else ""
-        )
-        print(f"\n\t**** Uff, that's a TIE{blackjack_msg}! ****")
-
-    else:
-        player_chips.withdraw(player_chips.bet)
-        print("\n\t**** 😢 Dealer Wins! 😢 ****")
+def should_hit():
+    user_ans = ""
+    while user_ans not in {"h", "s"}:
+        user_ans = input("\n\tDo you want to hit or stand? (type 'h' or 's'): ").lower()
+    return user_ans == "h"
 
 
-def ask_if_should_play_again() -> bool:
+def should_play_again() -> bool:
     player_response = ""
     while not (player_response.startswith("y") or player_response.startswith("n")):
         player_response = input(
@@ -146,18 +114,49 @@ def ask_if_should_play_again() -> bool:
     return player_response.startswith("y")
 
 
+def check_win(
+    player_hand: Hand,
+    player_chips: ChipAccount,
+    dealer_hand: Hand,
+) -> None:
+    if player_hand.score == dealer_hand.score:
+        print("\n\t**** Uff, that's a tie! ****")
+
+    elif dealer_hand.score == 21 and len(dealer_hand.cards) == 2:
+        print("\n\t**** 😢 Dealer wins with a blackjack! 😢 ****")
+        player_chips.withdraw(player_chips.bet)
+
+    elif player_hand.score == 21 and len(player_hand.cards) == 2:
+        pay = 3 / 2 * player_chips.bet
+        print(f"\n\t**** 🎉 {player_chips.owner}, you win with a BlackJack! 🎉 ****")
+        print(f"\t  You get 3/2 * your bet, so {pay} chips")
+        player_chips.deposit(pay)
+
+    elif player_hand.score > 21:
+        print("\n\t**** 😢 You bust! Dealer wins! 😢 ****")
+        player_chips.withdraw(player_chips.bet)
+
+    elif dealer_hand.score > 21:
+        print("\n\t**** 🎉 Dealer busts! You win! 🎉 ****")
+        player_chips.deposit(player_chips.bet)
+
+    elif dealer_hand.score > player_hand.score:
+        player_chips.withdraw(player_chips.bet)
+        print("\n\t**** 😢 Dealer Wins! 😢 ****")
+
+    else:
+        player_chips.deposit(player_chips.bet)
+        print(f"\n\t**** 🎉 {player_chips.owner}, you win! 🎉 ****")
+
+
 def run():
-    # Clear the terminal
-    os.system("clear" if os.name == "posix" else "cls")
-
-    starting_balance = 100
-
     print("Welcome to BlackJack!")
     player_name = input("\tPlease, enter your name: ").capitalize()
+    starting_balance = 100
 
     # Main Loop
     while True:
-        print("\n" * 50)  # Add a space to the terminal window
+        os.system("clear" if os.name == "posix" else "cls")
 
         deck = ["Ace", 2, 3, 4, 5, 6, 7, 8, 9, 10, "Jack", "Queen", "King"] * DECK_SUITS
         random.shuffle(deck)
@@ -175,57 +174,30 @@ def run():
             dealer_hand.add_card(deck.pop())
         print_hands(player_hand, dealer_hand)
 
-        # Check for instant BlackJack
-        if is_blackjack(player_hand, dealer_hand):
-            print_hands(player_hand, dealer_hand, hide=False)
-            check_win(player_hand, player_chips, dealer_hand)
-        else:
+        # If a natural blackjack exists then we don't need to deal anything
+        if not player_hand.score == 21 or dealer_hand.score == 21:
             # Player's turn
-            while ask_hit_stand() == "h":
-                print("\n" * 10)
+            while player_hand.score < 21 and should_hit():
                 player_hand.add_card(deck.pop())
                 print_hands(player_hand, dealer_hand)
 
-                # Check for bust
-                player_hand.adjust_sum()
-                if player_hand.sum > 21:
-                    player_chips.withdraw(player_chips.bet)
-                    print("\n\t**** 😢 You bust! Dealer wins! 😢 ****")
-                    print_hands(player_hand, dealer_hand, hide=False)
-                    break
+            # Dealer's turn. Reveal dealer's card
+            print("\n -- Dealer's turn! --")
+            while dealer_hand.score < 17 and player_hand.score <= 21:
+                print_hands(player_hand, dealer_hand, hiden_dealer=False)
+                dealer_hand.add_card(deck.pop())
 
-            # Dealer's turn
-            if player_hand.sum <= 21:
-                print("\n" * 10)
-                print("\n\t*** It's the Dealer's Turn! ***")
-                print_hands(
-                    player_hand, dealer_hand, hide=False
-                )  # Reveals dealer's hidden cards
+        print_hands(player_hand, dealer_hand, hiden_dealer=False)
+        check_win(player_hand, player_chips, dealer_hand)
 
-                # A dealer can only hit until he/she has a 17
-                while dealer_hand.sum < 17:
-                    dealer_hand.add_card(deck.pop())
-                    print_hands(player_hand, dealer_hand, hide=False)
-
-                    # Check for bust
-                    dealer_hand.adjust_sum()
-                    if dealer_hand.sum > 21:
-                        player_chips.deposit(player_chips.bet)
-                        print("\n\t**** 🎉 Dealer busts! You win! 🎉 ****")
-                        break
-
-                if not dealer_hand.sum > 21:
-                    check_win(player_hand, player_chips, dealer_hand)
-
-        print(f"\nDealer's hand sum is: {dealer_hand.sum}")
-        print(f"{player_name}'s hand sum is: {player_hand.sum}")
+        print(f"\nDealer's final hand sum is: {dealer_hand.score}")
+        print(f"{player_name}'s final hand sum is: {player_hand.score}")
 
         # Print player's available balance
         starting_balance = player_chips.balance
         print(f"\n\t**** Your available balance is now: {player_chips.balance} ****")
 
-        # Ask to play again!
-        if not ask_if_should_play_again():
+        if not should_play_again():
             print("\nBye!\n")
             return
 
